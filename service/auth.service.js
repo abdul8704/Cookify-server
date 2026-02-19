@@ -70,7 +70,7 @@ async function loginUser({ username, email, password }) {
     throw error;
   }
 
-  const token = jwt.sign(
+  const accessToken = jwt.sign(
     {
       id: user._id,
       username: user.username,
@@ -78,11 +78,24 @@ async function loginUser({ username, email, password }) {
       role: user.role
     },
     process.env.JWT_SECRET,
-    { expiresIn: '1d' }
+    { expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m' }
+  );
+
+  const refreshToken = jwt.sign(
+    {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      tokenType: 'refresh'
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRY || '7d' }
   );
 
   return {
-    token,
+    token: accessToken,
+    refreshToken,
     user: {
       id: user._id,
       name: user.name,

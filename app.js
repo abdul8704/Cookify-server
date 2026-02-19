@@ -1,17 +1,23 @@
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const app = express();
 const connectDB = require('./config/db');
 const authRoutes = require('./router/auth.routes');
 const userRoutes = require('./router/user.routes');
+const ingredientRoutes = require('./router/ingredient.routes');
+const inventoryRoutes = require('./router/inventory.routes');
 const authMiddleware = require('./middleware/auth.middleware');
 
 app.use(express.json());
+app.use(cookieParser());
 
 // JWT auth middleware for all routes except login/register
 app.use(authMiddleware);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/ingredients', ingredientRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 const PORT = process.env.PORT || 5000;
 

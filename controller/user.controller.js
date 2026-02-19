@@ -52,18 +52,62 @@ const createUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
-    const { name, username, email } = req.body;
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { name, username, email },
-      { new: true, runValidators: true }
-    ).select('-passwordHash');
+    const identifier = req.params.id;
+    const { name, username, email } = req.body || {};
+
+    // Build lookup query based on whether identifier is email or username
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    let query;
+    if (emailRegex.test(identifier)) {
+      query = { email: identifier.toLowerCase() };
+    } else {
+      query = { username: identifier };
+    }
+
+    const user = await User.findOne(query);
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    return res.status(200).json({ success: true, data: user });
+    // If email is being changed, ensure new email is not already in use
+    if (email && email.toLowerCase() !== user.email.toLowerCase()) {
+      const existingEmailUser = await User.findOne({
+        email: email.toLowerCase(),
+        _id: { $ne: user._id }
+      });
+      if (existingEmailUser) {
+        return res.status(409).json({ success: false, message: 'Email already in use' });
+      }
+    }
+
+    // If username is being changed, ensure new username is not already in use
+    if (username && username !== user.username) {
+      const existingUsernameUser = await User.findOne({
+        username,
+        _id: { $ne: user._id }
+      });
+      if (existingUsernameUser) {
+        return res.status(409).json({ success: false, message: 'Username already in use' });
+      }
+    }
+
+    if (typeof name === 'string' && name.trim()) {
+      user.name = name.trim();
+    }
+    if (typeof username === 'string' && username.trim()) {
+      user.username = username.trim();
+    }
+    if (typeof email === 'string' && email.trim()) {
+      user.email = email.toLowerCase().trim();
+    }
+
+    const updatedUser = await user.save();
+
+    const safeUser = updatedUser.toObject();
+    delete safeUser.passwordHash;
+
+    return res.status(200).json({ success: true, data: safeUser });
   } catch (err) {
     console.error('Update user error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -72,10 +116,30 @@ const updateUser = async (req, res) => {
 
 const deleteUser = async (req, res) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id).select('-passwordHash');
+    const identifier = req.params.id;
+
+    // Build lookup query based on whether identifier is email or username
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    let query;
+    if (emailRegex.test(identifier)) {
+      query = { email: identifier.toLowerCase() };
+    } else {
+      query = { username: identifier };
+    }
+
+    const user = await User.findOne(query);
+
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+
+    // Ensure a user can only delete their own account
+    if (user._id.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'You can only delete your own account' });
+    }
+
+    await user.deleteOne();
+
     return res.status(200).json({ success: true, message: 'User deleted' });
   } catch (err) {
     console.error('Delete user error:', err);
