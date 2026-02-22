@@ -18,14 +18,9 @@ const inventoryItemSchema = new mongoose.Schema({
     enum: ['meat','fruit', 'vegetable', 'spice', 'breakfast' ,'snack', 'lunch', 'dinner', 'oil', 'other'],
     default: 'other'
   },
-  quantity: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  units: {
+  imageURL: {
     type: String,
-    required: true,
+    default: '',
     trim: true
   }
 }, { timestamps: true });

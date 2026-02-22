@@ -6,6 +6,18 @@ async function getAllIngredients() {
   return Ingredient.find().sort({ name: 1 });
 }
 
+async function searchIngredients(query) {
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return Ingredient.find({
+    $or: [
+      { name: { $regex: escaped, $options: 'i' } },
+      { aliases: { $regex: escaped, $options: 'i' } }
+    ]
+  })
+    .select('name slug image')
+    .limit(10);
+}
+
 async function getIngredientByIdentifier(identifier) {
   let ingredient;
 
@@ -98,6 +110,7 @@ async function deleteIngredientById(id) {
 
 module.exports = {
   getAllIngredients,
+  searchIngredients,
   getIngredientByIdentifier,
   createIngredient,
   updateIngredientById,

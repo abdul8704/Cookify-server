@@ -52,9 +52,21 @@ function validateDeleteIngredient(req, res, next) {
   return next();
 }
 
+function validateSearchIngredient(req, res, next) {
+  const { q } = req.query || {};
+  if (!q || typeof q !== 'string' || !q.trim()) {
+    return sendBadRequest(res, 'query param "q" is required');
+  }
+  if (q.trim().length < 2) {
+    return sendBadRequest(res, 'search query must be at least 2 characters');
+  }
+  return next();
+}
+
 module.exports = {
   validateIdParam,
   validateCreateIngredient,
   validateUpdateIngredient,
-  validateDeleteIngredient
+  validateDeleteIngredient,
+  validateSearchIngredient
 };

@@ -2,10 +2,17 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 function authMiddleware(req, res, next) {
-  // Allow login and register without token
+  // Allow login, register, and password reset routes without token
   if (
     req.method === 'POST' &&
-    (req.path === '/api/auth/login' || req.path === '/api/auth/register')
+    (req.path === '/api/auth/login' ||
+     req.path === '/api/auth/register' ||
+     req.path === '/api/auth/check-username' ||
+     req.path === '/api/auth/refresh' ||
+     req.path === '/api/auth/logout' ||
+     req.path === '/api/auth/forgot-password' ||
+     req.path === '/api/auth/verify-otp' ||
+     req.path === '/api/auth/reset-password')
   ) {
     return next();
   }

@@ -10,6 +10,16 @@ const getAllIngredients = async (req, res) => {
   }
 };
 
+const searchIngredients = async (req, res) => {
+  try {
+    const results = await ingredientService.searchIngredients(req.query.q.trim());
+    return res.status(200).json({ success: true, data: results });
+  } catch (err) {
+    console.error('Search ingredients error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 const getIngredientById = async (req, res) => {
   try {
     const identifier = req.params.id;
@@ -55,6 +65,7 @@ const deleteIngredient = async (req, res) => {
 
 module.exports = {
   getAllIngredients,
+  searchIngredients,
   getIngredientById,
   createIngredient,
   updateIngredient,

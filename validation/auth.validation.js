@@ -36,7 +36,31 @@ function validateLogin(req, res, next) {
   return next();
 }
 
+function validateCheckUsername(req, res, next) {
+  const { username } = req.body || {};
+  if (!username || typeof username !== "string" || !username.trim()) {
+    return sendBadRequest(res, "username is required");
+  }
+  if (username.trim().length < 3) {
+    return sendBadRequest(res, "username must be at least 3 characters");
+  }
+  if (!/^[a-zA-Z0-9_]+$/.test(username.trim())) {
+    return sendBadRequest(res, "username can only contain letters, numbers, and underscores");
+  }
+  return next();
+}
+
+function validateRefresh(req, res, next) {
+  const { refreshToken } = req.body || {};
+  if (!refreshToken || typeof refreshToken !== "string" || !refreshToken.trim()) {
+    return sendBadRequest(res, "refreshToken is required");
+  }
+  return next();
+}
+
 module.exports = {
   validateRegister,
   validateLogin,
+  validateCheckUsername,
+  validateRefresh,
 };

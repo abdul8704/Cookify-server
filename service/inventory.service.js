@@ -8,9 +8,10 @@ async function getInventoryItemById(userId, itemId) {
   return InventoryItem.findOne({ _id: itemId, userId }).populate('ingredientId');
 }
 
-async function upsertInventoryItem({ userId, ingredientId, type, quantity, units }) {
+async function upsertInventoryItem({ userId, ingredientId, type, imageURL }) {
   const filter = { userId, ingredientId, type };
-  const update = { quantity, units };
+  const update = {};
+  if (imageURL !== undefined) update.imageURL = imageURL;
 
   const options = {
     new: true,
@@ -18,7 +19,7 @@ async function upsertInventoryItem({ userId, ingredientId, type, quantity, units
     setDefaultsOnInsert: true
   };
 
-  return InventoryItem.findOneAndUpdate(filter, update, options);
+  return InventoryItem.findOneAndUpdate(filter, update, options).populate('ingredientId');
 }
 
 async function updateInventoryItemById(userId, itemId, updates) {

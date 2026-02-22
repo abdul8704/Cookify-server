@@ -16,31 +16,25 @@ const register = async (req, res) => {
   }
 };
 
+const checkUsername = async (req, res) => {
+  try {
+    const { username } = req.body;
+    const available = await authService.isUsernameAvailable(username);
+    return res.status(200).json({ success: true, available });
+  } catch (err) {
+    console.error('Check username error:', err);
+    return res.status(err.status || 500).json({
+      success: false,
+      message: err.message || 'Server error'
+    });
+  }
+};
+
 const login = async (req, res) => {
   try {
     const result = await authService.loginUser(req.body);
-    const { token, refreshToken } = result;
 
-    // Set access token in HTTP-only cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: (process.env.JWT_ACCESS_MAXAGE_MINUTES
-        ? Number(process.env.JWT_ACCESS_MAXAGE_MINUTES) * 60 * 1000
-        : 15 * 60 * 1000)
-    });
-
-    // Set refresh token in HTTP-only cookie
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: (process.env.JWT_REFRESH_MAXAGE_DAYS
-        ? Number(process.env.JWT_REFRESH_MAXAGE_DAYS) * 24 * 60 * 60 * 1000
-        : 7 * 24 * 60 * 60 * 1000)
-    });
-
+    console.log('Login successful for user:', result.user.email);
     return res.status(200).json({
       success: true,
       data: result
@@ -53,8 +47,38 @@ const login = async (req, res) => {
     });
   }
 };
+
+const refresh = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    const accessToken = await authService.refreshAccessToken(refreshToken);
+    return res.status(200).json({ success: true, accessToken });
+  } catch (err) {
+    console.error('Refresh token error:', err);
+    return res.status(err.status || 500).json({
+      success: false,
+      message: err.message || 'Server error'
+    });
+  }
+};
     
+const logout = async (req, res) => {
+  try {
+    // Clear any server-side cookies
+    res.clearCookie('token');
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+    return res.status(200).json({ success: true, message: 'Logged out successfully' });
+  } catch (err) {
+    console.error('Logout error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 module.exports = {
   register,
-  login
+  login,
+  checkUsername,
+  refresh,
+  logout
 };

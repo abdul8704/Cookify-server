@@ -118,23 +118,29 @@ const deleteUser = async (req, res) => {
   try {
     const identifier = req.params.id;
 
-    // Build lookup query based on whether identifier is email or username
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    let query;
-    if (emailRegex.test(identifier)) {
-      query = { email: identifier.toLowerCase() };
-    } else {
-      query = { username: identifier };
+    // Try finding by MongoDB _id first, then by email/username
+    const mongoose = require('mongoose');
+    let user;
+    if (mongoose.Types.ObjectId.isValid(identifier)) {
+      user = await User.findById(identifier);
     }
-
-    const user = await User.findOne(query);
+    if (!user) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      let query;
+      if (emailRegex.test(identifier)) {
+        query = { email: identifier.toLowerCase() };
+      } else {
+        query = { username: identifier };
+      }
+      user = await User.findOne(query);
+    }
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Ensure a user can only delete their own account
-    if (user._id.toString() !== req.user.id) {
+    // Admins can delete any user; regular users can only delete themselves
+    if (req.user.role !== 'admin' && user._id.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: 'You can only delete your own account' });
     }
 
@@ -147,10 +153,52 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-passwordHash');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    return res.status(200).json({ success: true, data: user });
+  } catch (err) {
+    console.error('Get me error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+const updateUserRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!role || !['admin', 'user'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'role must be "admin" or "user"' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    user.role = role;
+    const updatedUser = await user.save();
+
+    const safeUser = updatedUser.toObject();
+    delete safeUser.passwordHash;
+
+    return res.status(200).json({ success: true, data: safeUser });
+  } catch (err) {
+    console.error('Update user role error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 module.exports = {
     getAllUsers,
     getUserById,
     createUser,
     updateUser,
-    deleteUser
+    deleteUser,
+    getMe,
+    updateUserRole
 };

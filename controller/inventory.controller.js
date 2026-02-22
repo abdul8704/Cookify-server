@@ -31,24 +31,17 @@ const getInventoryItem = async (req, res) => {
 const createOrUpdateInventoryItem = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { ingredientId, type, quantity, units } = req.body || {};
+    const { ingredientId, type, imageURL } = req.body || {};
 
     if (!ingredientId) {
       return res.status(400).json({ success: false, message: 'ingredientId is required' });
-    }
-    if (typeof quantity !== 'number') {
-      return res.status(400).json({ success: false, message: 'quantity must be a number' });
-    }
-    if (!units || typeof units !== 'string' || !units.trim()) {
-      return res.status(400).json({ success: false, message: 'units is required' });
     }
 
     const item = await inventoryService.upsertInventoryItem({
       userId,
       ingredientId,
       type: type || 'other',
-      quantity,
-      units: units.trim()
+      imageURL: imageURL || ''
     });
 
     return res.status(200).json({ success: true, data: item });

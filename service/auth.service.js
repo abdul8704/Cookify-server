@@ -10,9 +10,16 @@ async function registerUser({ name, username, email, password, role }) {
     throw error;
   }
 
-  const existingUser = await User.findOne({ $or: [{ email }, { username }] });
-  if (existingUser) {
-    const error = new Error('User with this email or username already exists');
+  const existingEmail = await User.findOne({ email: email.toLowerCase() });
+  if (existingEmail) {
+    const error = new Error('An account with this email already exists');
+    error.status = 409;
+    throw error;
+  }
+
+  const existingUsername = await User.findOne({ username: username.toLowerCase() });
+  if (existingUsername) {
+    const error = new Error('This username is already taken');
     error.status = 409;
     throw error;
   }
@@ -54,6 +61,7 @@ async function loginUser({ username, email, password }) {
   if (!user) {
     const error = new Error('Invalid credentials');
     error.status = 401;
+    console.error('Login error: user not found -', query);
     throw error;
   }
 
@@ -61,6 +69,7 @@ async function loginUser({ username, email, password }) {
   if (!isMatch) {
     const error = new Error('Invalid credentials');
     error.status = 401;
+    console.error('Login error: wrong password for user -', user.email);
     throw error;
   }
 
@@ -100,12 +109,75 @@ async function loginUser({ username, email, password }) {
       id: user._id,
       name: user.name,
       username: user.username,
-      email: user.email
+      email: user.email,
+      role: user.role
     }
   };
 }
 
+async function isUsernameAvailable(username) {
+  if (!username) {
+    const error = new Error('Username is required');
+    error.status = 400;
+    throw error;
+  }
+  const existing = await User.findOne({ username: username.toLowerCase() });
+  return !existing;
+}
+
+async function refreshAccessToken(refreshToken) {
+  if (!refreshToken) {
+    const error = new Error('Refresh token is required');
+    error.status = 400;
+    throw error;
+  }
+
+  if (!process.env.JWT_SECRET) {
+    const error = new Error('JWT_SECRET is not configured');
+    error.status = 500;
+    throw error;
+  }
+
+  let payload;
+  try {
+    payload = jwt.verify(refreshToken, process.env.JWT_SECRET);
+  } catch (err) {
+    const error = new Error('Invalid or expired refresh token');
+    error.status = 401;
+    throw error;
+  }
+
+  if (payload.tokenType !== 'refresh') {
+    const error = new Error('Invalid token type');
+    error.status = 401;
+    throw error;
+  }
+
+  // Verify user still exists
+  const user = await User.findById(payload.id);
+  if (!user) {
+    const error = new Error('User no longer exists');
+    error.status = 401;
+    throw error;
+  }
+
+  const accessToken = jwt.sign(
+    {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.role
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m' }
+  );
+
+  return accessToken;
+}
+
 module.exports = {
   registerUser,
-  loginUser
+  loginUser,
+  isUsernameAvailable,
+  refreshAccessToken
 };

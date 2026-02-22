@@ -48,8 +48,15 @@ const ingredientSchema = new mongoose.Schema({
       vitaminA: { type: Number, default: 0 },
       vitaminC: { type: Number, default: 0 },
       vitaminD: { type: Number, default: 0 },
+      sodium: { type: Number, default: 0 },
       zinc: { type: Number, default: 0 }
     }
+  },
+
+  image: {
+    type: String,
+    default: null,
+    trim: true
   },
 
   density: {
@@ -59,7 +66,6 @@ const ingredientSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-ingredientSchema.index({ slug: 1 }, { unique: true });
 ingredientSchema.index({ name: 1 });
 ingredientSchema.index({ aliases: 1 });
 
