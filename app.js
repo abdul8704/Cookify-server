@@ -8,6 +8,7 @@ const ingredientRoutes = require('./router/ingredient.routes');
 const inventoryRoutes = require('./router/inventory.routes');
 const recipeRoutes = require('./router/recipe.routes');
 const profileRoutes = require('./router/profile.routes');
+const favouriteRoutes = require('./router/favourite.routes');
 const authMiddleware = require('./middleware/auth.middleware');
 
 app.use(express.json());
@@ -22,6 +23,7 @@ app.use('/api/ingredients', ingredientRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/recipes', recipeRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/favourites', favouriteRoutes);
 
 const PORT = process.env.PORT || 5000;
 
