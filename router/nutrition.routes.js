@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const NutritionController = require('../controller/nutrition.controller');
 
-// Backward-compatible aliases for earlier calorie tracking route naming.
 router.get('/goals', NutritionController.getGoals);
 router.put('/goals', NutritionController.updateGoals);
 

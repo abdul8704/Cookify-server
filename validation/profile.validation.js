@@ -4,9 +4,12 @@ function validateProfileUpdate(req, res, next) {
     bio,
     phone,
     gender,
+    goals,
     height,
     weight,
     activityLevel,
+    dietaryPreferences,
+    allergies,
   } = req.body || {};
 
   if (displayName !== undefined && typeof displayName !== 'string') {
@@ -43,6 +46,16 @@ function validateProfileUpdate(req, res, next) {
       .json({ success: false, message: 'gender must be male, female, other, or empty' });
   }
 
+  if (
+    goals !== undefined &&
+    !['weightloss', 'weightgain', 'maintain'].includes(goals)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'goals must be one of: weightloss, weightgain, maintain',
+    });
+  }
+
   if (height !== undefined && height !== null) {
     if (typeof height !== 'number' || height < 0) {
       return res
@@ -69,6 +82,20 @@ function validateProfileUpdate(req, res, next) {
       success: false,
       message:
         'activityLevel must be one of: sedentary, light, moderate, active, very_active, or empty',
+    });
+  }
+
+  if (dietaryPreferences !== undefined && !Array.isArray(dietaryPreferences)) {
+    return res.status(400).json({
+      success: false,
+      message: 'dietaryPreferences must be an array of strings',
+    });
+  }
+
+  if (allergies !== undefined && !Array.isArray(allergies)) {
+    return res.status(400).json({
+      success: false,
+      message: 'allergies must be an array of strings',
     });
   }
 

@@ -7,7 +7,7 @@ const recipeIngredientSchema = new mongoose.Schema({
     required: true
   },
   quantity: {
-    type: Number,
+    type: Number,        // grams of this ingredient per 100 g of the recipe
     required: true
   },
   unit: {
@@ -99,14 +99,33 @@ const recipeSchema = new mongoose.Schema({
     lowercase: true
   },
 
-  nutrition: {
+  // Nutrition values per 100 g of this recipe (auto-computed from ingredients)
+  nutritionPer100g: {
     calories: { type: Number, default: 0 },
-    protein: { type: Number, default: 0 },
-    carbs: { type: Number, default: 0 },
-    fat: { type: Number, default: 0 },
-    fiber: { type: Number, default: 0 }
+    macros: {
+      protein: { type: Number, default: 0 },
+      carbs: { type: Number, default: 0 },
+      fat: { type: Number, default: 0 },
+      fiber: { type: Number, default: 0 },
+    },
+    micros: {
+      iron: { type: Number, default: 0 },
+      calcium: { type: Number, default: 0 },
+      magnesium: { type: Number, default: 0 },
+      potassium: { type: Number, default: 0 },
+      sodium: { type: Number, default: 0 },
+      zinc: { type: Number, default: 0 },
+      vitaminA: { type: Number, default: 0 },
+      vitaminC: { type: Number, default: 0 },
+      vitaminD: { type: Number, default: 0 },
+    },
   },
 
+  // Typical grams in one serving (e.g. 250 g for a bowl of rice)
+  servingSizeGrams: {
+    type: Number,
+    default: null,
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User"

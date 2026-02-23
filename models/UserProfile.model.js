@@ -38,11 +38,11 @@ const userProfileSchema = new mongoose.Schema(
       enum: ['male', 'female', 'other', ''],
       default: '',
     },
-      goals: {
-        type: String,
-        enum: ['weightloss', 'weightgain', 'maintain'],
-        default: 'maintain',
-      },
+    goals: {
+      type: String,
+      enum: ['weightloss', 'weightgain', 'maintain'],
+      default: 'maintain',
+    },
     height: {
       type: Number, // in cm
       default: null,
