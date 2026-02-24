@@ -1,130 +1,186 @@
-const fs = require("fs");
-const XLSX = require("xlsx");
+const axios = require("axios");
+const OAuth = require("oauth-1.0a");
+const crypto = require("crypto");
+const { json } = require("stream/consumers");
+const Ing = require('./models/Ingredient.model');
+const connectDB = require('./config/db'); const BASE_URL = "https://platform.fatsecret.com/rest/server.api";
 
-// ===== CONFIG =====
-const INPUT_FILE = "./nutrition_db.xlsx";   // your xlsx file
-const OUTPUT_FILE = "./ingredients.json";
+const CONSUMER_KEY = "f98d614e97f84984a49c522af9dd3516";
+const CONSUMER_SECRET = "c168fa00fd58454583aa9f1c2190b1bb";
 
-// ===== HELPERS =====
+// ---------------- OAuth setup ----------------
 
-// Convert NaN / undefined to 0
-function safeNumber(value) {
-  if (value === undefined || value === null) return 0;
-  const num = Number(value);
-  return isNaN(num) ? 0 : num;
+const oauth = OAuth({
+  consumer: { key: CONSUMER_KEY, secret: CONSUMER_SECRET },
+  signature_method: "HMAC-SHA1",
+  hash_function(base, key) {
+    return crypto.createHmac("sha1", key).update(base).digest("base64");
+  }
+});
+
+// ---------------- Core request ----------------
+
+async function fatsecretRequest(params) {
+  const requestData = {
+    url: BASE_URL,
+    method: "GET",
+    data: params
+  };
+
+  const oauthParams = oauth.authorize(requestData);
+
+  try {
+    const res = await axios.get(BASE_URL, {
+      params: { ...params, ...oauthParams },
+      timeout: 10000
+    });
+
+    if (res.data?.error) {
+      throw new Error(
+        `${res.data.error.code}: ${res.data.error.message}`
+      );
+    }
+
+    return res.data;
+  } catch (err) {
+    if (err.response) {
+      console.error("HTTP:", err.response.status);
+      console.error(JSON.stringify(err.response.data, null, 2));
+    } else {
+      console.error(err.message);
+    }
+    throw err;
+  }
 }
 
-// Extract bracket content and clean name
-function extractNameAndAlias(name) {
-  if (!name) return { cleanName: "", bracketAlias: null };
+// ---------------- API calls ----------------
 
-  const match = name.match(/\((.*?)\)/);
+async function searchFoods(query, maxResults = 5) {
+  const data = await fatsecretRequest({
+    method: "foods.search",
+    search_expression: query,
+    max_results: maxResults,
+    format: "json"
+  });
 
-  let cleanName = name;
-  let bracketAlias = null;
+  return data.foods?.food || [];
+}
 
-  if (match) {
-    bracketAlias = match[1].trim().toLowerCase();
-    cleanName = name.replace(/\(.*?\)/, "").trim();
-  }
+async function getFoodDetails(foodId) {
+  const data = await fatsecretRequest({
+    method: "food.get",
+    food_id: foodId,
+    format: "json"
+  });
+
+  return data.food || null;
+}
+
+// ---------------- Mapping logic ----------------
+
+function slugify(str) {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
+function normalizePer100g(serving) {
+  const grams = Number(serving.metric_serving_amount);
+  if (!grams || grams <= 0) return null;
+
+  const factor = 100 / grams;
+  const num = v => Math.round(v ? Number(v) * factor : 0);
 
   return {
-    cleanName: cleanName.toLowerCase(),
-    bracketAlias
+    calories: num(serving.calories),
+    macros: {
+      protein: num(serving.protein),
+      carbs: num(serving.carbohydrate),
+      fat: num(serving.fat),
+      fiber: num(serving.fiber)
+    },
+    micros: {
+      iron: num(serving.iron),
+      calcium: num(serving.calcium),
+      magnesium: num(serving.magnesium),
+      potassium: num(serving.potassium),
+      vitaminA: num(serving.vitamin_a),
+      vitaminC: num(serving.vitamin_c),
+      vitaminD: num(serving.vitamin_d),
+      sodium: num(serving.sodium),
+      zinc: num(serving.zinc)
+    }
   };
 }
 
-// Parse aliases column
-function parseAliases(value) {
-  if (!value) return [];
+function mapFatSecretFoodToIngredient(food) {
+  if (!food?.servings?.serving) return null;
 
-  if (Array.isArray(value)) return value;
+  const servings = Array.isArray(food.servings.serving)
+    ? food.servings.serving
+    : [food.servings.serving];
 
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) return parsed.map(a => a.toLowerCase().trim());
-    } catch (e) {
-      return value.split(",").map(a => a.toLowerCase().trim());
-    }
-  }
-
-  return [];
-}
-
-// Generate random sodium per 100g (0–0.8g)
-function randomSodium() {
-  return Number((Math.random() * 0.8).toFixed(3));
-}
-
-// ===== MAIN =====
-
-function convert() {
-  const workbook = XLSX.readFile(INPUT_FILE);
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-
-  const rows = XLSX.utils.sheet_to_json(sheet);
-
-  const transformed = rows.map(row => {
-    const { cleanName, bracketAlias } = extractNameAndAlias(row.name);
-
-    let aliases = parseAliases(row.aliases);
-
-    // Add clean name and bracket alias
-    if (cleanName) aliases.push(cleanName);
-    if (bracketAlias) aliases.push(bracketAlias);
-
-    // Remove duplicates
-    aliases = [...new Set(aliases)];
-
-    return {
-      name: cleanName,
-      slug: row.slug?.toString().toLowerCase().trim(),
-
-      aliases,
-
-      category: row.category || "other",
-      baseUnit: row.baseUnit || "g",
-
-      nutritionPer100g: {
-        calories: safeNumber(row.calories),
-
-        macros: {
-          protein: safeNumber(row.protein),
-          carbs: safeNumber(row.carbs),
-          fat: safeNumber(row.fat),
-          fiber: safeNumber(row.fiber)
-        },
-
-        micros: {
-          iron: safeNumber(row.iron),
-          calcium: safeNumber(row.calcium),
-          magnesium: safeNumber(row.magnesium),
-          potassium: safeNumber(row.potassium),
-
-          vitaminA: safeNumber(row.vitaminA),
-          vitaminC: safeNumber(row.vitaminC),
-          vitaminD: safeNumber(row.vitaminD),
-
-          sodium: randomSodium(),
-
-          zinc: safeNumber(row.zinc)
-        }
-      },
-
-      density: row.density !== undefined && !isNaN(row.density)
-        ? Number(row.density)
-        : null
-    };
-  });
-
-  fs.writeFileSync(
-    OUTPUT_FILE,
-    JSON.stringify(transformed, null, 2)
+  const gramServing = servings.find(
+    s => s.metric_serving_unit === "g"
   );
 
-  console.log("Conversion complete.");
+  if (!gramServing) return null;
+
+  const nutritionPer100g = normalizePer100g(gramServing);
+  if (!nutritionPer100g) return null;
+
+  return {
+    name: food.food_name.trim(),
+    slug: slugify(food.food_name),
+    aliases: [
+      food.food_name.toLowerCase(),
+      ...(food.brand_name ? [food.brand_name.toLowerCase()] : [])
+    ],
+    category: "other",
+    baseUnit: "g",
+    nutritionPer100g,
+    image: null,
+    density: null
+  };
 }
 
-convert();
+// ---------------- Demo run ----------------
+
+(async () => {
+  try {
+    await connectDB();
+    console.log("Searching for: banana");
+
+    const foods = await searchFoods("banana");
+    if (!foods.length) {
+      console.warn("No foods found");
+      return;
+    }
+
+    let res = []
+
+    for (const f of foods) {
+      const food = await getFoodDetails(f.food_id);
+      if (!food) continue;
+
+      const ingredient = mapFatSecretFoodToIngredient(food);
+      if (!ingredient) continue;
+
+      res.push((ingredient))
+    }
+    const ops = res.map(item => ({
+      updateOne: {
+        filter: { slug: item.slug },
+        update: { $set: item },
+        upsert: true
+      }
+    }));
+    const result = await Ing.bulkWrite(ops);
+    console.log(`Successfully upserted data. Modified: ${result.modifiedCount}, Upserted: ${result.upsertedCount}`);
+    process.exit(0);
+  } catch (err) {
+    console.error("🔥 Fatal:", err.message);
+    process.exit(1);
+  }
+})();
